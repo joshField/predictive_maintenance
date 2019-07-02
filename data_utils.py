@@ -15,7 +15,9 @@ def get_training_data():
     for engine_no in train['engine_no'].unique():
         mapper[engine_no] = train['time_in_cycles'].loc[train['engine_no'] == engine_no].max()
     train['RUL'] = train['engine_no'].apply(lambda nr: mapper[nr]) - train['time_in_cycles']
-    train['failure_near'] = train['RUL'] < 10.0
+
+    # add this for classifier
+    # train['failure_near'] = train['RUL'] < 10.0
 
     # get rid of nan and constant values
     cols_nan = train.columns[train.isna().any()].tolist()
@@ -23,7 +25,6 @@ def get_training_data():
     train = train.drop(columns=cols_nan + cols_const)
     return train
 
-#TODO plot all sensor data, plot performance of model, compare model performance
 
 if __name__ == "__main__":
     data = get_training_data()
