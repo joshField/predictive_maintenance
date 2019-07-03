@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split, GridSearchCV, learning_curve
-from sklearn import preprocessing, model_selection
+from sklearn.model_selection import train_test_split, GridSearchCV, learning_curve, KFold
+from sklearn import preprocessing
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
@@ -10,6 +10,7 @@ from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import data_utils
+
 
 # TODO reframe as a classifier
 
@@ -79,8 +80,9 @@ def svm():
 
 def main():
     # get training data and split into training and test sets
-    train = data_utils.get_training_data()
-    features_train, features_test, labels_train, labels_test = train_test_split(train.drop(['RUL'], axis=1), train['RUL'])
+    train = data_utils.get_training_data(is_classifier=False)
+    features_train, features_test, labels_train, labels_test = train_test_split(train.drop(['RUL'], axis=1),
+                                                                                train['RUL'])
     feature_names = features_test.columns
     features_train = np.array(features_train)
     features_test = np.array(features_test)
@@ -101,7 +103,7 @@ def main():
     for model, params in regression_models:
         # setup pipeline and 5 fold cross validation with standardization
         pipeline = Pipeline(steps=[('standardize', preprocessing.StandardScaler()), ('model', model)])
-        cv = model_selection.KFold(5)
+        cv = KFold(5)
         model_name = type(model).__name__
         print("Testing %s -----------------------------\n\tparams:%s" % (model_name, params))
 
@@ -117,7 +119,7 @@ def main():
         # show the best estimator parameters and performance
         print("Best estimator: \n%s" % optimized_model.best_estimator_)
         y_pred = optimized_model.predict(features_test)
-        score =  mean_absolute_error(labels_test, y_pred)
+        score = mean_absolute_error(labels_test, y_pred)
         print("Mean Squared Error: ", mean_squared_error(labels_test, y_pred))
         print("Mean Absolute Error: ", score)
         print("R-Squared: ", r2_score(labels_test, y_pred))
