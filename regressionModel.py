@@ -1,18 +1,14 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn import preprocessing
-from sklearn import model_selection
+from sklearn.model_selection import train_test_split, GridSearchCV, learning_curve
+from sklearn import preprocessing, model_selection
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import AdaBoostRegressor
-from sklearn.linear_model import ElasticNet
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
+from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.svm import SVR
-from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.linear_model import LinearRegression
 import data_utils
 
 # TODO reframe as a classifier
@@ -82,7 +78,6 @@ def svm():
 
 
 def main():
-
     # get training data and split into training and test sets
     train = data_utils.get_training_data()
     features_train, features_test, labels_train, labels_test = train_test_split(train.drop(['RUL'], axis=1), train['RUL'])
@@ -102,12 +97,8 @@ def main():
         svm()
     ]
 
-    # these models don't have feature_importances_ member in scikit
-    no_imp = ['SVM', 'LinearRegression', 'ElasticNet']
     results = {}
-
     for model, params in regression_models:
-
         # setup pipeline and 5 fold cross validation with standardization
         pipeline = Pipeline(steps=[('standardize', preprocessing.StandardScaler()), ('model', model)])
         cv = model_selection.KFold(5)
@@ -131,19 +122,15 @@ def main():
         print("Mean Absolute Error: ", score)
         print("R-Squared: ", r2_score(labels_test, y_pred))
         results[model_name] = score
+
+        # view learning curve for each estimator
+        plot_learning_curve(optimized_model.best_estimator_, model_name, features_train, labels_train, cv=cv)
         print("-----------------------------")
 
-        # view feature importances
+        # view feature importances - below models don't have feature_importances_ member in scikit
+        no_imp = ['SVM', 'LinearRegression', 'ElasticNet']
         if model_name not in no_imp:
-            print(model_name)
-            importances = optimized_model.best_estimator_.named_steps['model'].feature_importances_
-            indices = np.argsort(importances)[::-1]
-            f, ax = plt.subplots(figsize=(11,9))
-            plt.bar(range(features_test.shape[1]), importances[indices], align="center")
-            plt.xticks(range(features_test.shape[1]), feature_names[indices], rotation="vertical")
-            plt.xlim([-1,features_test.shape[1]])
-            plt.title("%s Importances" % model_name)
-            plt.show()
+            plot_importances(model_name, optimized_model.best_estimator_, features_test, feature_names)
 
         # view model performance by plotting actual vs predicted Remaining Useful Life for the best model
         fig, ax = plt.subplots()
@@ -154,7 +141,51 @@ def main():
         ax.set_title('(%s) Remaining Useful Life Actual vs. Predicted' % model_name)
         plt.show()
 
-    # comopare all models by viewing scores side by side
+    # compare all models by viewing scores side by side
+    plot_model_performance(results)
+
+
+def plot_learning_curve(estimator, model_name, X, y, cv):
+    """ Plots the learning curve for the training set and the cross-validation sets """
+    train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv)
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    plt.grid()
+    plt.title("(%s) - Learning Cuves" % model_name)
+    plt.xlabel("Training examples")
+    plt.ylabel("Score")
+
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                     train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+             label="Training score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
+             label="Cross-validation score")
+
+    plt.legend(loc="best")
+    plt.show()
+
+
+def plot_importances(model_name, estimator, features_test, feature_names):
+    """ Plots the feature importances according to the given estimator """
+    print(model_name)
+    importances = estimator.named_steps['model'].feature_importances_
+    indices = np.argsort(importances)[::-1]
+    f, ax = plt.subplots(figsize=(11, 9))
+    plt.bar(range(features_test.shape[1]), importances[indices], align="center")
+    plt.xticks(range(features_test.shape[1]), feature_names[indices], rotation="vertical")
+    plt.xlim([-1, features_test.shape[1]])
+    plt.title("%s Importances" % model_name)
+    plt.show()
+
+
+def plot_model_performance(results):
+    """ Compare all models mean absolute error, could be any scoring metric though """
     print(results)
     fig, ax = plt.subplots()
     names = results.keys()
